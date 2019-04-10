@@ -6,5 +6,6 @@ see https://github.com/samirkumardas/jmuxer
 ```
 set GOPATH=%GOPATH%;%cd%
 go build -ldflags "-s -w" main.go
+main.exe
 explorer http://127.0.0.1:20005/
 ```
