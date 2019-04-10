@@ -1,0 +1,89 @@
+<html style="background: #eee;">
+<script type="text/javascript" src="jmuxer.min.js"></script>
+<div style="width: 350px; height: 50px; margin: auto;"><h3>jmuxer 测试:aac/h264播放 </h3></div>
+<div style="width: 640px; height: 360px; margin: auto; padding-top: 5%">
+	<video id="player" style="background: #fff; width: 100%; height: 100%;" autoplay oncontextmenu="return false;"></video>
+</div>
+<script>
+var jmuxer = new JMuxer({
+    node: 'player',
+    mode: 'both',
+    debug: false,
+});
+var client = null;
+var audio = null;
+var video = null;
+var duration = 0;
+
+function start(sessionId) {
+    if (client != null) {
+        client.send({ t: 'close', m: 'close for restart' });
+        client.close()
+    }
+
+    client = new WebSocket('ws://127.0.0.1:20005/h5player');
+    client.onopen = function (event) {
+        client.send(JSON.stringify({ t: 'open', m: '' }));
+        client.send(JSON.stringify({ t: 'userHasLogin', m: '' }));
+    };
+    client.onmessage = function (event) {
+        if (typeof (event.data) === "string") {
+            var msg = JSON.parse(event.data);
+            if (typeof (msg['t']) === 'string' && typeof (msg['m']) === 'string') {
+                switch (msg['t']) {
+                case 'userHasLogin':
+                    var msg1 = JSON.parse(msg['m']);
+                    if (msg1['status']) {
+                        client.send(JSON.stringify({ t: 'streamStart', m: msg1['message'] }));
+                    }
+                    break;
+                case 'streamStart':
+                    var msg1 = JSON.parse(msg['m']);
+                    if (msg1['status']) {
+                        console.log('开始直播');
+                    } else {
+                        alert('无法开始直播: ' + msg1['message'])
+                    }
+                    break;
+                case 'streamStop':
+                    break;
+                }
+            }
+        } else {
+            reader = new FileReader();
+            reader.onload = function (event) {
+                if (event.target.result < 5) {
+                    return
+                }
+                var d = new Uint8Array(event.target.result);
+                var currentDuration = d[0] << 24 + d[1] << 16 + d[2] << 8 + d[3];
+                if (duration < currentDuration) {
+                    audio = null;
+                    video = null;
+                }
+                if (d[4] == 1) {
+                    audio = d.slice(5)
+                } else {
+                    video = d.slice(5)
+                }
+                if (audio != null && video != null) {
+                    jmuxer.feed({
+                        audio: audio,
+                        video: video,
+                        duration: duration
+                    });
+                }
+            };
+            reader.readAsArrayBuffer(event.data);
+        }
+    }
+    client.onclose = function (event) {
+    }
+    client.onerror = function (event) {
+    }
+}
+
+start(0);
+</script>
+
+</html>
